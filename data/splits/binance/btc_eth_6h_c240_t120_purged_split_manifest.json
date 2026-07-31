@@ -1,0 +1,67 @@
+{
+  "dataset": "Split temporal purgado BTC-ETH",
+  "created_at_utc": "2026-07-31T13:05:02.419827Z",
+  "assignment_key": "target_start_utc",
+  "config": {
+    "train_end_exclusive_utc": "2023-07-01T00:00:00Z",
+    "validation_start_utc": "2023-10-01T00:00:00Z",
+    "validation_end_exclusive_utc": "2025-01-01T00:00:00Z",
+    "test_start_utc": "2025-04-01T00:00:00Z",
+    "minimum_purge_days": 90,
+    "purge_interpretation": "Se eliminan 90 dias de inicios de objetivo; esto separa intervalos completos de condicion (60d) y objetivo (30d) sin timestamps compartidos"
+  },
+  "inputs": {
+    "window_index": {
+      "path": "data/windows/binance/btc_eth_6h_c240_t120_s1_index.csv",
+      "sha256": "8dd15e3d0b6151bf5428dd57988e1d4ad413a22d739486d11f7a337240056faa"
+    },
+    "windows": {
+      "path": "data/windows/binance/btc_eth_6h_c240_t120_s1.npz",
+      "sha256": "6dc3ea0d5fc02808ea687490ccadead7109ea390d8516c169cfd15b84ca57be9"
+    },
+    "conditions": {
+      "path": "data/features/binance/btc_eth_6h_c240_condition_summary.npz",
+      "sha256": "83529a79bdc8c91d490d32f1beb5f679a51069433358c697b023e4c9ce804103"
+    }
+  },
+  "outputs": {
+    "split_arrays": {
+      "path": "data/splits/binance/btc_eth_6h_c240_t120_purged_split.npz",
+      "sha256": "c0dd122b1c62c74008ec2b0d8dc83364afc6c1acd7ff72669d93fc9c0ab974e9"
+    },
+    "split_index": {
+      "path": "data/splits/binance/btc_eth_6h_c240_t120_purged_split_index.csv",
+      "sha256": "5c01dc050e19c7dabc2f9eb127ec7628eb8e1db79e555c536cb658014740b95a"
+    }
+  },
+  "audit": {
+    "total_samples": 9096,
+    "train_samples": 4710,
+    "validation_samples": 1832,
+    "test_samples": 1826,
+    "purge_train_validation_samples": 368,
+    "purge_validation_test_samples": 360,
+    "retained_samples": 8368,
+    "purged_samples": 728,
+    "retained_ratios": {
+      "train": 0.5628585086042065,
+      "validation": 0.21892925430210325,
+      "test": 0.21821223709369025
+    },
+    "train_first_target_start_utc": "2017-11-06T00:00:00Z",
+    "train_last_target_start_utc": "2023-06-30T18:00:00Z",
+    "validation_first_target_start_utc": "2023-10-01T00:00:00Z",
+    "validation_last_target_start_utc": "2024-12-31T18:00:00Z",
+    "test_first_target_start_utc": "2025-04-01T00:00:00Z",
+    "test_last_target_start_utc": "2026-07-01T06:00:00Z",
+    "train_validation_raw_gap_hours": 60.0,
+    "validation_test_raw_gap_hours": 12.0,
+    "raw_intervals_overlap": false
+  },
+  "rules": {
+    "temporal_only": true,
+    "random_shuffle": false,
+    "test_dates_frozen": true,
+    "normalization": "Pendiente; ajustar solo con train_sample_ids"
+  }
+}

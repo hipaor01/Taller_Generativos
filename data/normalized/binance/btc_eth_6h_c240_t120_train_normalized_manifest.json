@@ -1,0 +1,126 @@
+{
+  "dataset": "BTC-ETH normalizado exclusivamente con entrenamiento",
+  "created_at_utc": "2026-07-31T13:15:19.126956Z",
+  "method": {
+    "transform": "z = (x - mean_train) / std_train",
+    "standard_deviation": "Poblacional, ddof=0",
+    "condition_fit": "Solo condition_features[train_sample_ids]",
+    "return_fit": "Retornos temporales unicos cubiertos por ventanas train; se evita ponderarlos por solapamiento",
+    "validation_test": "Transformados con parametros train, sin reajuste ni clipping"
+  },
+  "inputs": {
+    "windows": {
+      "path": "data/windows/binance/btc_eth_6h_c240_t120_s1.npz",
+      "sha256": "6dc3ea0d5fc02808ea687490ccadead7109ea390d8516c169cfd15b84ca57be9"
+    },
+    "conditions": {
+      "path": "data/features/binance/btc_eth_6h_c240_condition_summary.npz",
+      "sha256": "83529a79bdc8c91d490d32f1beb5f679a51069433358c697b023e4c9ce804103"
+    },
+    "split": {
+      "path": "data/splits/binance/btc_eth_6h_c240_t120_purged_split.npz",
+      "sha256": "c0dd122b1c62c74008ec2b0d8dc83364afc6c1acd7ff72669d93fc9c0ab974e9"
+    },
+    "returns": {
+      "path": "data/features/binance/btc_eth_6h_log_returns.csv",
+      "sha256": "16f214f1becdb50b255688c2906c104eb55eded09b8bf6e378cfdf43b5f1d5a3"
+    }
+  },
+  "output": {
+    "path": "data/normalized/binance/btc_eth_6h_c240_t120_train_normalized.npz",
+    "sha256": "3fbdd9a4949715ff16997c3f445d5df1ae07218d6ba5e5a7eb422ec076e963f9",
+    "condition_features_shape": [
+      9096,
+      14
+    ],
+    "condition_returns_shape": [
+      9096,
+      240,
+      2
+    ],
+    "target_returns_shape": [
+      9096,
+      120,
+      2
+    ],
+    "dtype": "float64"
+  },
+  "parameters": {
+    "feature_names": [
+      "btc_cumulative_log_return_60d",
+      "btc_realized_volatility_ann_60d",
+      "btc_current_drawdown_60d",
+      "btc_log_volume_z_7d",
+      "btc_log_volume_change_7d",
+      "btc_mean_log_range_7d",
+      "eth_cumulative_log_return_60d",
+      "eth_realized_volatility_ann_60d",
+      "eth_current_drawdown_60d",
+      "eth_log_volume_z_7d",
+      "eth_log_volume_change_7d",
+      "eth_mean_log_range_7d",
+      "btc_eth_correlation_30d",
+      "joint_trend_regime_score_60d"
+    ],
+    "condition_feature_mean": [
+      0.0314863206867189,
+      0.6553689258726187,
+      -0.16062618249251012,
+      0.01056975627712031,
+      0.0034038684129647752,
+      0.02435685604194362,
+      0.007955077666430665,
+      0.8225719814326536,
+      -0.19869317022362326,
+      -0.014749567588041123,
+      -0.00021759986386153023,
+      0.031221611039184805,
+      0.8373556436822016,
+      0.10640752411954114
+    ],
+    "condition_feature_scale": [
+      0.3233812316249486,
+      0.21725602496376156,
+      0.11831340043315451,
+      0.6620636583648368,
+      0.3057330893245853,
+      0.013446590128203609,
+      0.3782819933847888,
+      0.24341457551011442,
+      0.1555194122124047,
+      0.6397094775720011,
+      0.31797367215959954,
+      0.014561083492387984,
+      0.13894715805094432,
+      1.0365976695479893
+    ],
+    "assets": [
+      "BTC",
+      "ETH"
+    ],
+    "return_mean": [
+      0.0001144354725498767,
+      0.00011496460941497506
+    ],
+    "return_scale": [
+      0.019967963781850784,
+      0.024538656599948853
+    ]
+  },
+  "audit": {
+    "total_samples": 9096,
+    "train_samples": 4710,
+    "validation_samples": 1832,
+    "test_samples": 1826,
+    "unique_training_return_rows": 8300,
+    "condition_features": 14,
+    "return_assets": 2,
+    "condition_zero_variance_features": [],
+    "return_zero_variance_assets": [],
+    "train_condition_max_abs_mean": 1.3917402851779651e-14,
+    "train_condition_max_abs_std_error": 3.552713678800501e-15,
+    "training_returns_max_abs_mean": 1.1707502437387569e-17,
+    "training_returns_max_abs_std_error": 1.9984014443252818e-15,
+    "normalized_non_finite_values": 0
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "dataset": "Panel limpio Binance spot BTC-ETH",
+  "created_at_utc": "2026-07-31T11:17:22.247471Z",
+  "policy": {
+    "calendar": "Rejilla UTC regular con frecuencia de 6 horas",
+    "alignment": "Cobertura comun BTC-ETH",
+    "missing_values": "Sin imputacion; campos numericos vacios e indicadores *_missing=1",
+    "truncated_candles": "Se conservan valores y cierre real en *_source_close_time_utc; se marcan con *_duration_valid=0 y no se imputan",
+    "downstream_rule": "Excluir ventanas que contengan filas con is_complete=0",
+    "price_currency_note": "USDT es la divisa cotizada; no es USD fiat"
+  },
+  "inputs": [
+    {
+      "symbol": "BTCUSDT",
+      "path": "data/raw/binance/btcusdt_6h.csv",
+      "sha256": "61243029e0121629f8e79c4b01b0137974613b6875b9a573b2201fad3da31494"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "path": "data/raw/binance/ethusdt_6h.csv",
+      "sha256": "af97f78e931e3d5276be653738e29d7b84c6305fbcd5d2b04d5f2a261b3813fc"
+    }
+  ],
+  "output": {
+    "path": "data/processed/binance/btc_eth_6h_panel.csv",
+    "sha256": "788093a644db8e563d0ea3227ec86c8d7d29733e0822afe1a2b950f68628523d"
+  },
+  "audit": {
+    "interval": "6h",
+    "first_open_time_utc": "2017-08-17T00:00:00Z",
+    "last_open_time_utc": "2026-07-31T00:00:00Z",
+    "calendar_rows": 13081,
+    "complete_rows": 13063,
+    "incomplete_rows": 18,
+    "missing_rows_by_asset": {
+      "btc": 6,
+      "eth": 6
+    },
+    "common_missing_rows": 6,
+    "one_sided_missing_rows": 0,
+    "gap_open_times_utc": [
+      "2018-02-08T06:00:00Z",
+      "2018-02-08T12:00:00Z",
+      "2018-02-08T18:00:00Z",
+      "2018-02-09T00:00:00Z",
+      "2018-06-26T06:00:00Z",
+      "2019-05-15T06:00:00Z"
+    ],
+    "invalid_duration_rows_by_asset": {
+      "btc": 12,
+      "eth": 12
+    },
+    "common_invalid_duration_rows": 12,
+    "one_sided_invalid_duration_rows": 0,
+    "invalid_duration_open_times_utc": [
+      "2017-09-06T12:00:00Z",
+      "2018-02-08T00:00:00Z",
+      "2018-06-26T00:00:00Z",
+      "2018-07-04T00:00:00Z",
+      "2018-11-14T00:00:00Z",
+      "2019-03-12T00:00:00Z",
+      "2019-05-15T00:00:00Z",
+      "2019-08-15T00:00:00Z",
+      "2020-02-19T06:00:00Z",
+      "2020-12-21T12:00:00Z",
+      "2021-04-25T00:00:00Z",
+      "2021-08-13T00:00:00Z"
+    ]
+  }
+}

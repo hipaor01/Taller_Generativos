@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Los datos brutos se regeneran con scripts/download_binance.py.
+data/raw/binance/*.csv
+data/raw/binance/*.json
+data/processed/binance/*.csv
+data/processed/binance/*.json
+data/features/binance/*.csv
+data/features/binance/*.json
+data/windows/binance/*.npz
+data/windows/binance/*.csv
+data/windows/binance/*.json
+data/splits/binance/*.npz
+data/splits/binance/*.csv
+data/splits/binance/*.json
+data/normalized/binance/*.npz
+data/normalized/binance/*.json
+
+# Snapshot congelado que necesitan las personas B y C. Estas excepciones se
+# versionan en Git para que el repositorio quede listo para entrenar al clonarlo.
+!data/processed/binance/btc_eth_6h_panel.csv
+!data/processed/binance/manifest_6h.json
+!data/splits/binance/btc_eth_6h_c240_t120_purged_split.npz
+!data/splits/binance/btc_eth_6h_c240_t120_purged_split_index.csv
+!data/splits/binance/btc_eth_6h_c240_t120_purged_split_manifest.json
+!data/normalized/binance/btc_eth_6h_c240_t120_train_normalized.npz
+!data/normalized/binance/btc_eth_6h_c240_t120_train_normalized_manifest.json
