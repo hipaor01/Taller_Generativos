@@ -594,3 +594,68 @@ actualizar los checksums y comunicar una nueva versión al equipo.
 - Evaluador común: métricas marginales, temporales, de dependencia BTC–ETH, de
   trayectoria, riesgo, diversidad y memorización disponibles en
   `crypto_generative.evaluation`.
+- CVAE condicional: búsqueda completa, evaluación y artefactos terminados.
+- Próximo componente opcional: comparar contra el *normalizing flow* del equipo.
+
+## CVAE condicional
+
+El CVAE aprende la distribución de trayectorias futuras condicionada por las 14
+variables resumen del estado reciente del mercado:
+
+```text
+encoder(target_returns, condition) -> z_mean, z_log_var, z
+decoder(z, condition)              -> loc, scale, rho
+```
+
+Es la adaptación temporal del VAE convolucional visto en clase. El notebook
+demuestra por qué un decoder MSE no basta para retornos financieros: aproxima la
+media y genera trayectorias demasiado suaves. La búsqueda compara MSE, Gaussiana
+bivariante y Student-t bivariante. Para las salidas probabilísticas se minimiza:
+
+```text
+loss = NLL_Student_t_bivariante(x | loc, scale, rho)
+       + beta * KL_regularizada_con_free_bits
+```
+
+La Student-t conserva colas gruesas y genera BTC y ETH conjuntamente mediante
+una correlación aprendida en cada paso. La KL organiza el espacio latente para
+muestrear `z ~ N(0, I)` y los *free bits* evitan el colapso posterior temprano.
+
+La búsqueda ejecutada compara 39 configuraciones: distribución, capacidad,
+latentes 4–16, `beta`, *free bits*, grados de libertad, condición resumen,
+Conv1D, GRU, híbrida y pérdida acumulada. Cada candidato usa un barajado
+determinista; el top 3 se repite con semillas 7, 42 y 123. El ganador se elige
+por `media + desviación` del score de validación, no por una ejecución aislada.
+
+El ganador actual es `student_medium_l8_b01`: Student-t bivariante, filtros
+`(32, 64)`, capa densa 96, latente 8, `beta=0.01`, *free bits* `0.02`, 5 grados
+de libertad y condición resumen. El KL de validación permanece activo (~3,55 de
+media entre semillas), por lo que no hay evidencia de colapso posterior.
+
+La implementación vive en
+[`notebooks/CVAE_BTC_ETH.ipynb`](notebooks/CVAE_BTC_ETH.ipynb). Se entrega
+completamente ejecutada, con 14 celdas de código y cuatro figuras. El notebook
+entrena únicamente el ganador; la sección teórica resume la búsqueda de 39
+configuraciones y explica extensamente su arquitectura, distribución y pérdida.
+
+Instalación:
+
+```bash
+python3 -m pip install -e '.[cvae]'
+```
+
+El entrenamiento usa solo `train_sample_ids`, selecciona con
+`validation_sample_ids` y evalúa el ganador en test deslizante y en 16 anclas
+no solapadas. En test obtiene volatilidades generadas BTC/ETH de
+`0.01099/0.01664`, frente a `0.01091/0.01707` reales; error de correlación
+`0.0239`; Wasserstein acumulado `0.3110`; Wasserstein de drawdown `0.1941`; y
+score conjunto `0.1426`.
+
+Las marginales y la dependencia conjunta son buenas, pero la distribución
+acumulada de 30 días todavía suaviza regímenes. Las conclusiones extremas son
+exploratorias porque solo existen 16 anclas de test no solapadas.
+
+Los artefactos quedan en `outputs/cvae_best/`: `encoder.keras`, `decoder.keras`,
+`metadata.json` y `test_scenarios.npz`. Los CSV de búsqueda y estabilidad se
+conservan como evidencia histórica del benchmark, pero el notebook no vuelve a
+entrenar esos candidatos.
