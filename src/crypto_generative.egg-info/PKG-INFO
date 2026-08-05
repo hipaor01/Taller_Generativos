@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: crypto-generative
+Version: 0.1.0
+Summary: Pipeline reproducible de datos para simulacion generativa cripto
+Requires-Python: >=3.9
+Requires-Dist: numpy>=1.23
+Provides-Extra: notebooks
+Requires-Dist: jupyter>=1.0; extra == "notebooks"
+Requires-Dist: matplotlib>=3.8; extra == "notebooks"
+Requires-Dist: pandas>=2.0; extra == "notebooks"

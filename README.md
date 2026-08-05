@@ -232,6 +232,194 @@ data/processed/binance/btc_eth_6h_panel.csv
 
 No se deben reconstruir precios a partir de retornos todavía normalizados.
 
+## Evaluador común
+
+El primer bloque del evaluador compartido ya está disponible como módulo
+importable. Tras instalar el proyecto con `python -m pip install -e .`, se pueden evaluar las distribuciones marginales de sus trayectorias
+con la misma implementación:
+
+```python
+import pandas as pd
+
+from crypto_generative.evaluation import (
+    CrossAssetDependenceConfig,
+    DiversityMemorizationConfig,
+    RiskMetricsConfig,
+    TemporalDependenceConfig,
+    TrajectoryEvaluator,
+    TrajectoryMetricsConfig,
+)
+
+
+# target_validation procede del ejemplo de carga anterior.
+reference_returns = target_validation * return_scale + return_mean
+training_returns = target_train * return_scale + return_mean
+
+# Salida condicional del modelo: [condiciones, draws, 120 pasos, 2 activos].
+generated_conditional_returns = generated_normalized * return_scale + return_mean
+
+# Las familias descriptivas consumen un lote 3D.
+generated_returns = generated_conditional_returns.reshape(
+    -1,
+    generated_conditional_returns.shape[-2],
+    generated_conditional_returns.shape[-1],
+)
+
+evaluator = TrajectoryEvaluator(assets=assets.tolist())
+marginal_report = evaluator.evaluate_marginals(
+    reference_paths=reference_returns,
+    candidate_paths=generated_returns,
+)
+
+table = pd.DataFrame(marginal_report.to_records())
+print(table)
+
+temporal_report = evaluator.evaluate_temporal_dependence(
+    reference_paths=reference_returns,
+    candidate_paths=generated_returns,
+    config=TemporalDependenceConfig(
+        max_lag=20,                    # 5 días en velas de 6h
+        volatility_window=20,          # volatilidad móvil de 5 días
+        high_volatility_quantile=0.90,
+        extreme_quantile=0.99,
+        extreme_clustering_window=4,   # extremos durante las 24h previas
+    ),
+)
+
+temporal_table = pd.DataFrame(temporal_report.to_records())
+print(temporal_table)
+
+cross_asset_report = evaluator.evaluate_cross_asset_dependence(
+    reference_paths=reference_returns,
+    candidate_paths=generated_returns,
+    config=CrossAssetDependenceConfig(
+        rolling_window=20,       # correlación móvil de 5 días
+        stress_quantile=0.90,
+        joint_drop_quantile=0.05,
+        lower_tail_quantile=0.05,
+    ),
+)
+
+cross_asset_table = pd.DataFrame(cross_asset_report.to_records())
+print(cross_asset_table)
+
+trajectory_report = evaluator.evaluate_trajectories(
+    reference_paths=reference_returns,
+    candidate_paths=generated_returns,
+    config=TrajectoryMetricsConfig(periods_per_year=4 * 365),
+)
+
+trajectory_table = pd.DataFrame(trajectory_report.to_records())
+print(trajectory_table)
+
+risk_report = evaluator.evaluate_risk(
+    reference_paths=reference_returns,
+    candidate_paths=generated_conditional_returns,
+    config=RiskMetricsConfig(
+        confidence_levels=(0.95, 0.99),
+        portfolio_weights=(0.60, 0.40),
+        portfolio_name="portfolio_60_40",
+        es_stability_repetitions=100,
+        es_stability_sample_size=1_000,
+        random_state=42,
+    ),
+)
+
+risk_table = pd.DataFrame(risk_report.to_records())
+print(risk_table)
+
+diversity_report = evaluator.evaluate_diversity_and_memorization(
+    reference_paths=reference_returns,
+    candidate_paths=generated_returns,
+    training_paths=training_returns,
+    config=DiversityMemorizationConfig(
+        max_paths_per_set=2_000,
+        projection_dimensions=24,
+        neighbor_candidates=8,
+        near_memorization_quantile=0.01,
+        coverage_radius_quantile=0.95,
+        discriminator_repetitions=5,
+        random_state=42,
+    ),
+)
+
+diversity_table = pd.DataFrame(diversity_report.to_records())
+print(diversity_table.T)
+```
+
+El contrato común es deliberadamente estricto:
+
+- retornos logarítmicos **desnormalizados**;
+- forma `[trayectorias, tiempo, activos]`, salvo el candidato condicional 4D de
+  `evaluate_risk()`;
+- horizonte y orden de activos iguales en referencia y candidato;
+- número de trayectorias real y sintético puede ser distinto;
+- no se admiten `NaN` ni infinitos.
+
+Si el modelo genera un tensor
+`[condiciones, draws, tiempo, activos]`, para las familias marginal, temporal,
+BTC–ETH y trayectoria hay que combinar únicamente las dos primeras dimensiones,
+como hace `generated_returns` en el ejemplo anterior.
+
+Para `evaluate_risk()` debe conservarse el tensor 4D. El evaluador calculará un
+VaR y un ES distintos para cada condición y comparará cada observación real con
+su propia distribución predictiva. Si recibe un candidato 3D, como el
+bootstrap, aplicará una única distribución de riesgo agregada a todas las
+observaciones reales.
+
+La familia marginal calcula por activo media, desviación típica, asimetría,
+curtosis en exceso, cuantiles 1/5/50/95/99 %, frecuencia y magnitud de extremos,
+y distancia Wasserstein-1 absoluta y normalizada.
+
+La familia temporal calcula ACF de retornos, retornos absolutos y cuadrados;
+persistencia de volatilidad; frecuencia y duración de episodios de alta
+volatilidad; y agrupamiento de extremos. Los umbrales de alta volatilidad y
+movimiento extremo se ajustan **solo en la referencia** y se aplican sin
+reajuste al candidato. Las ACF y las duraciones respetan siempre los límites de
+cada trayectoria.
+
+La familia BTC–ETH compara correlación contemporánea, distribución de
+correlaciones móviles, correlación en calma y estrés, frecuencia de caídas
+conjuntas y dependencia en la cola inferior. La probabilidad de caída conjunta
+usa umbrales del 5 % ajustados solo en la referencia. La dependencia de cola
+usa el percentil propio de cada lote para aislar mejor la estructura de
+dependencia respecto de los errores marginales.
+
+La familia de trayectorias compara la distribución del retorno acumulado a 30
+días, volatilidad realizada anualizada, máximo drawdown, duración máxima del
+drawdown, máximo y mínimo dentro del horizonte y tiempo hasta el valor mínimo.
+Las duraciones se expresan en pasos de seis horas y los retornos y drawdowns
+como fracciones de riqueza inicial.
+
+La familia de riesgo calcula VaR y Expected Shortfall al 95 % y 99 % para BTC,
+ETH y una cartera inicial 60/40 sin rebalanceo. Incluye errores frente a la
+referencia, número y tasa de excepciones, error de cobertura, estabilidad del ES
+mediante remuestreo y percentiles que las pérdidas reales ocupan dentro del
+modelo. Las pérdidas se expresan como fracción positiva de la riqueza inicial.
+
+La familia de diversidad y memorización calcula duplicados, vecinos cercanos
+entre escenarios, coincidencias exactas y cercanía anómala a train, cobertura
+de validación, proporciones de regímenes de volatilidad y exactitud de un
+discriminador lineal real–sintético. Una exactitud próxima a 0,5 indica que el
+discriminador no separa ambos lotes; valores altos indican diferencias
+sistemáticas.
+
+Las distancias son RMSE sobre retornos estandarizados. La búsqueda usa una
+proyección aleatoria para proponer vecinos y recalcula la distancia original de
+los mejores candidatos. Para limitar coste y memoria se evalúa como máximo el
+número de trayectorias indicado por `max_paths_per_set`, mediante una muestra
+reproducible. El informe conserva los tamaños realmente utilizados.
+
+La evaluación *train on synthetic, test on real* no forma parte de esta API
+genérica: necesita definir una tarea predictiva, etiquetas y un estimador común,
+por lo que debe plantearse como experimento complementario separado.
+
+Durante el desarrollo se debe pasar **validación** como referencia. Prueba se
+utilizará únicamente cuando el modelo y su configuración estén congelados. El
+solapamiento de ventanas no desaparece por usar el evaluador: no deben
+interpretarse sus filas como historias independientes al construir intervalos
+de confianza.
+
 ## Split temporal y purgas
 
 La clave de asignación es `target_start_utc`:
@@ -401,4 +589,8 @@ actualizar los checksums y comunicar una nueva versión al equipo.
 - Vector de condición: completado.
 - Split temporal con purga: congelado.
 - Normalización ajustada en entrenamiento: completada.
-- Próximo componente: *block bootstrap* multivariante.
+- *Block bootstrap* multivariante: primera versión didáctica en
+  [`notebooks/01_block_bootstrap_multivariante.ipynb`](notebooks/01_block_bootstrap_multivariante.ipynb).
+- Evaluador común: métricas marginales, temporales, de dependencia BTC–ETH, de
+  trayectoria, riesgo, diversidad y memorización disponibles en
+  `crypto_generative.evaluation`.
