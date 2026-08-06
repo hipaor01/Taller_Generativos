@@ -646,14 +646,24 @@ python3 -m pip install -e '.[cvae]'
 
 El entrenamiento usa solo `train_sample_ids`, selecciona con
 `validation_sample_ids` y evalúa el ganador en test deslizante y en 16 anclas
-no solapadas. En test obtiene volatilidades generadas BTC/ETH de
-`0.01099/0.01664`, frente a `0.01091/0.01707` reales; error de correlación
-`0.0239`; Wasserstein acumulado `0.3110`; Wasserstein de drawdown `0.1941`; y
-score conjunto `0.1426`.
+no solapadas. Genera 20 escenarios por condición y entrega los retornos en
+unidades originales al `TrajectoryEvaluator` compartido. Así se calculan las
+seis familias comunes: marginales, dependencia temporal, dependencia BTC–ETH,
+trayectorias, riesgo y diversidad/memorización.
 
-Las marginales y la dependencia conjunta son buenas, pero la distribución
-acumulada de 30 días todavía suaviza regímenes. Las conclusiones extremas son
-exploratorias porque solo existen 16 anclas de test no solapadas.
+En la ejecución publicada, las desviaciones generadas BTC/ETH son
+`0.01093/0.01654`, frente a `0.01091/0.01707` reales, y el error absoluto de
+correlación contemporánea es `0.023`. Las trayectorias son 100 % únicas, no hay
+coincidencias exactas con train y la cobertura de la referencia alcanza el
+94.8 %. Aun así, el Wasserstein normalizado del retorno final es `0.436/0.240`,
+la dependencia de cola inferior tiene un error de `0.165` y un discriminador
+distingue real de sintético con 74.5 % de acierto.
+
+El riesgo condicional no está todavía calibrado: en VaR 95 % aparecen alrededor
+de 20–22 % de excepciones en vez del 5 % esperado. El VaR/ES 99 % es además
+exploratorio porque 20 draws por condición no resuelven suficientemente esa
+cola. Las 16 anclas no solapadas sirven como sensibilidad, no como estimación
+precisa de eventos extremos.
 
 Los artefactos quedan en `outputs/cvae_best/`: `encoder.keras`, `decoder.keras`,
 `metadata.json` y `test_scenarios.npz`. Los CSV de búsqueda y estabilidad se

@@ -19,7 +19,6 @@ cvae = [
     "tensorflow>=2.16",
     "matplotlib>=3.7",
     "pandas>=2.1",
-    "scipy>=1.11",
 ]
 
 [tool.setuptools.packages.find]
