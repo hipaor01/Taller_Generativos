@@ -634,9 +634,13 @@ media entre semillas), por lo que no hay evidencia de colapso posterior.
 
 La implementación vive en
 [`notebooks/CVAE_BTC_ETH.ipynb`](notebooks/CVAE_BTC_ETH.ipynb). Se entrega
-completamente ejecutada, con 14 celdas de código y cuatro figuras. El notebook
+completamente ejecutada, con 25 celdas de código y nueve figuras. El notebook
 entrena únicamente el ganador; la sección teórica resume la búsqueda de 39
 configuraciones y explica extensamente su arquitectura, distribución y pérdida.
+La evaluación replica las vistas del baseline de *block bootstrap* para leer con
+el mismo formato dependencia temporal, relación BTC–ETH, trayectorias, riesgo y
+diversidad. El notebook advierte que el baseline publicado usa validación y el
+CVAE usa test, por lo que sus cifras no constituyen aún una comparación directa.
 
 Instalación:
 
