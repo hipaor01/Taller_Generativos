@@ -594,3 +594,82 @@ actualizar los checksums y comunicar una nueva versión al equipo.
 - Evaluador común: métricas marginales, temporales, de dependencia BTC–ETH, de
   trayectoria, riesgo, diversidad y memorización disponibles en
   `crypto_generative.evaluation`.
+- CVAE condicional: búsqueda completa, evaluación y artefactos terminados.
+- Próximo componente opcional: comparar contra el *normalizing flow* del equipo.
+
+## CVAE condicional
+
+El CVAE aprende la distribución de trayectorias futuras condicionada por las 14
+variables resumen del estado reciente del mercado:
+
+```text
+encoder(target_returns, condition) -> z_mean, z_log_var, z
+decoder(z, condition)              -> loc, scale, rho
+```
+
+Es la adaptación temporal del VAE convolucional visto en clase. El notebook
+demuestra por qué un decoder MSE no basta para retornos financieros: aproxima la
+media y genera trayectorias demasiado suaves. La búsqueda compara MSE, Gaussiana
+bivariante y Student-t bivariante. Para las salidas probabilísticas se minimiza:
+
+```text
+loss = NLL_Student_t_bivariante(x | loc, scale, rho)
+       + beta * KL_regularizada_con_free_bits
+```
+
+La Student-t conserva colas gruesas y genera BTC y ETH conjuntamente mediante
+una correlación aprendida en cada paso. La KL organiza el espacio latente para
+muestrear `z ~ N(0, I)` y los *free bits* evitan el colapso posterior temprano.
+
+La búsqueda ejecutada compara 39 configuraciones: distribución, capacidad,
+latentes 4–16, `beta`, *free bits*, grados de libertad, condición resumen,
+Conv1D, GRU, híbrida y pérdida acumulada. Cada candidato usa un barajado
+determinista; el top 3 se repite con semillas 7, 42 y 123. El ganador se elige
+por `media + desviación` del score de validación, no por una ejecución aislada.
+
+El ganador actual es `student_medium_l8_b01`: Student-t bivariante, filtros
+`(32, 64)`, capa densa 96, latente 8, `beta=0.01`, *free bits* `0.02`, 5 grados
+de libertad y condición resumen. El KL de validación permanece activo (~3,55 de
+media entre semillas), por lo que no hay evidencia de colapso posterior.
+
+La implementación vive en
+[`notebooks/CVAE_BTC_ETH.ipynb`](notebooks/CVAE_BTC_ETH.ipynb). Se entrega
+completamente ejecutada, con 25 celdas de código y nueve figuras. El notebook
+entrena únicamente el ganador; la sección teórica resume la búsqueda de 39
+configuraciones y explica extensamente su arquitectura, distribución y pérdida.
+La evaluación replica las vistas del baseline de *block bootstrap* para leer con
+el mismo formato dependencia temporal, relación BTC–ETH, trayectorias, riesgo y
+diversidad. El notebook advierte que el baseline publicado usa validación y el
+CVAE usa test, por lo que sus cifras no constituyen aún una comparación directa.
+
+Instalación:
+
+```bash
+python3 -m pip install -e '.[cvae]'
+```
+
+El entrenamiento usa solo `train_sample_ids`, selecciona con
+`validation_sample_ids` y evalúa el ganador en test deslizante y en 16 anclas
+no solapadas. Genera 20 escenarios por condición y entrega los retornos en
+unidades originales al `TrajectoryEvaluator` compartido. Así se calculan las
+seis familias comunes: marginales, dependencia temporal, dependencia BTC–ETH,
+trayectorias, riesgo y diversidad/memorización.
+
+En la ejecución publicada, las desviaciones generadas BTC/ETH son
+`0.01093/0.01654`, frente a `0.01091/0.01707` reales, y el error absoluto de
+correlación contemporánea es `0.023`. Las trayectorias son 100 % únicas, no hay
+coincidencias exactas con train y la cobertura de la referencia alcanza el
+94.8 %. Aun así, el Wasserstein normalizado del retorno final es `0.436/0.240`,
+la dependencia de cola inferior tiene un error de `0.165` y un discriminador
+distingue real de sintético con 74.5 % de acierto.
+
+El riesgo condicional no está todavía calibrado: en VaR 95 % aparecen alrededor
+de 20–22 % de excepciones en vez del 5 % esperado. El VaR/ES 99 % es además
+exploratorio porque 20 draws por condición no resuelven suficientemente esa
+cola. Las 16 anclas no solapadas sirven como sensibilidad, no como estimación
+precisa de eventos extremos.
+
+Los artefactos quedan en `outputs/cvae_best/`: `encoder.keras`, `decoder.keras`,
+`metadata.json` y `test_scenarios.npz`. Los CSV de búsqueda y estabilidad se
+conservan como evidencia histórica del benchmark, pero el notebook no vuelve a
+entrenar esos candidatos.

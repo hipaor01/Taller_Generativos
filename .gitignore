@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+outputs/
+tmp/
 
 # Los datos brutos se regeneran con scripts/download_binance.py.
 data/raw/binance/*.csv

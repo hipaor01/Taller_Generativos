@@ -9,6 +9,7 @@ from pathlib import Path
 
 from _bootstrap import PROJECT_ROOT
 
+from crypto_generative.data.artifacts import relative_or_absolute  # noqa: E402
 from crypto_generative.data.binance import (  # noqa: E402
     INTERVAL_MILLISECONDS,
     BinanceKlineClient,
@@ -102,7 +103,7 @@ def main() -> int:
                 requested_start_utc=start.isoformat().replace("+00:00", "Z"),
                 requested_end_exclusive_utc=end.isoformat().replace("+00:00", "Z"),
                 downloaded_at_utc=downloaded_at,
-                csv_path=str(output_path.relative_to(PROJECT_ROOT)),
+                csv_path=relative_or_absolute(output_path, PROJECT_ROOT),
                 audit=audit,
             )
         )

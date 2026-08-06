@@ -15,6 +15,12 @@ notebooks = [
     "matplotlib>=3.8",
     "pandas>=2.0",
 ]
+cvae = [
+    "tensorflow>=2.16",
+    "keras>=3.0",
+    "matplotlib>=3.7",
+    "pandas>=2.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
