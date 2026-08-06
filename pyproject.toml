@@ -5,14 +5,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crypto-generative"
 version = "0.1.0"
-description = "Pipeline reproducible de datos para simulacion generativa cripto"
-requires-python = ">=3.9"
-dependencies = ["numpy>=1.23"]
+description = "Pipeline reproducible de datos y modelos generativos para simulación cripto"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.23",
+    "torch>=2.1",
+    "matplotlib>=3.7",
+]
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
 notebooks = [
     "jupyter>=1.0",
-    "matplotlib>=3.8",
     "pandas>=2.0",
 ]
 
