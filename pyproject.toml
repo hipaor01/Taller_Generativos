@@ -17,6 +17,7 @@ notebooks = [
 ]
 cvae = [
     "tensorflow>=2.16",
+    "keras>=3.0",
     "matplotlib>=3.7",
     "pandas>=2.1",
 ]
