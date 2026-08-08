@@ -639,8 +639,12 @@ entrena únicamente el ganador; la sección teórica resume la búsqueda de 39
 configuraciones y explica extensamente su arquitectura, distribución y pérdida.
 La evaluación replica las vistas del baseline de *block bootstrap* para leer con
 el mismo formato dependencia temporal, relación BTC–ETH, trayectorias, riesgo y
-diversidad. El notebook advierte que el baseline publicado usa validación y el
-CVAE usa test, por lo que sus cifras no constituyen aún una comparación directa.
+diversidad. Ambos evalúan ahora sobre las mismas 1.826 trayectorias del test
+congelado, por lo que sus métricas permiten una comparación descriptiva fuera de
+muestra. El bootstrap genera una distribución agregada y el CVAE 20 escenarios
+por condición; además, las ventanas de test se solapan. Por ello la lectura debe
+conservar las diferencias entre pronóstico incondicional y condicional y no
+tratarse como un backtest con observaciones independientes.
 
 Instalación:
 
