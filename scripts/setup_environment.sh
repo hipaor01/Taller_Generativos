@@ -4,20 +4,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+UV_BIN="${UV_BIN:-uv}"
+EXPECTED_UV_VERSION="0.11.24"
 
-if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-  echo "ERROR: no se encuentra $PYTHON_BIN. Instala Python 3.10 o posterior."
+if ! command -v "$UV_BIN" >/dev/null 2>&1; then
+  echo "ERROR: no se encuentra uv. Instala uv ${EXPECTED_UV_VERSION}: https://docs.astral.sh/uv/"
   exit 1
 fi
 
-if [ ! -d .venv ]; then
-  "$PYTHON_BIN" -m venv .venv
+ACTUAL_UV_VERSION="$("$UV_BIN" --version | awk '{print $2}')"
+if [ "$ACTUAL_UV_VERSION" != "$EXPECTED_UV_VERSION" ]; then
+  echo "ERROR: se requiere uv ${EXPECTED_UV_VERSION}; encontrado ${ACTUAL_UV_VERSION}."
+  exit 1
 fi
 
-# shellcheck disable=SC1091
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
+"$UV_BIN" sync --frozen --all-extras
+"$UV_BIN" run --frozen python scripts/check_environment.py
 
 printf '\nEntorno preparado. Actívalo con:\n  source .venv/bin/activate\n'

@@ -1,10 +1,17 @@
 Metadata-Version: 2.4
 Name: crypto-generative
 Version: 0.1.0
-Summary: Pipeline reproducible de datos para simulacion generativa cripto
-Requires-Python: >=3.9
-Requires-Dist: numpy>=1.23
+Summary: Pipeline reproducible de datos y modelos generativos para simulación cripto
+Requires-Python: ==3.11.*
+Requires-Dist: numpy==2.4.6
+Requires-Dist: torch==2.13.0
+Requires-Dist: tensorflow==2.21.0
+Requires-Dist: matplotlib==3.11.1
+Provides-Extra: dev
+Requires-Dist: pytest==9.1.1; extra == "dev"
 Provides-Extra: notebooks
-Requires-Dist: jupyter>=1.0; extra == "notebooks"
-Requires-Dist: matplotlib>=3.8; extra == "notebooks"
-Requires-Dist: pandas>=2.0; extra == "notebooks"
+Requires-Dist: jupyter==1.1.1; extra == "notebooks"
+Requires-Dist: pandas==3.0.5; extra == "notebooks"
+Provides-Extra: cvae
+Requires-Dist: keras==3.15.1; extra == "cvae"
+Requires-Dist: pandas==3.0.5; extra == "cvae"

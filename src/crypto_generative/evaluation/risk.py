@@ -8,6 +8,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
+from crypto_generative.portfolio import BuyAndHoldPortfolio, PortfolioConfig
+
 
 @dataclass(frozen=True)
 class RiskMetricsConfig:
@@ -287,9 +289,15 @@ def _loss_targets(
         for index, asset in enumerate(assets)
     }
     if portfolio_weights is not None:
-        portfolio_wealth = np.sum(
-            terminal_wealth * np.asarray(portfolio_weights),
-            axis=-1,
+        portfolio = BuyAndHoldPortfolio(
+            PortfolioConfig(
+                assets=tuple(str(asset) for asset in assets),
+                weights=tuple(float(weight) for weight in portfolio_weights),
+                initial_value=1.0,
+            )
+        )
+        portfolio_wealth = portfolio.revalue(paths).final_values.reshape(
+            terminal_wealth.shape[:-1]
         )
         losses[portfolio_name] = 1.0 - portfolio_wealth
     return losses

@@ -13,9 +13,11 @@ PANEL_COLUMNS = (
     "open_time_utc",
     "btc_high",
     "btc_low",
+    "btc_close",
     "btc_volume",
     "eth_high",
     "eth_low",
+    "eth_close",
     "eth_volume",
     "is_complete",
 )
@@ -64,9 +66,11 @@ def write_fixture(root, complete=True):
                     "open_time_utc": timestamp(index),
                     "btc_high": 110 + index,
                     "btc_low": 100 + index,
+                    "btc_close": 105 + index,
                     "btc_volume": 10 + index,
                     "eth_high": 55 + index,
                     "eth_low": 50 + index,
+                    "eth_close": 52 + index,
                     "eth_volume": 20 + index,
                     "is_complete": "0" if index == 1 and not complete else "1",
                 }
@@ -100,6 +104,22 @@ class ConditionFeatureBuilderTest(unittest.TestCase):
                     volume_recent_steps=2,
                     correlation_steps=3,
                 ).build(*paths)
+
+    def test_builds_latest_condition_without_requiring_a_future_target(self):
+        with TemporaryDirectory() as directory:
+            _, _, panel_path = write_fixture(Path(directory))
+            snapshot = ConditionFeatureBuilder(
+                volume_recent_steps=2,
+                correlation_steps=3,
+                annualization_days=1,
+            ).build_latest(panel_path, condition_steps=4)
+
+        self.assertEqual(snapshot.features.shape, (14,))
+        self.assertEqual(snapshot.condition_returns.shape, (4, 2))
+        self.assertEqual(snapshot.condition_start_utc, timestamp(2))
+        self.assertEqual(snapshot.condition_end_utc, timestamp(5))
+        self.assertEqual(snapshot.forecast_start_utc, timestamp(6))
+        np.testing.assert_allclose(snapshot.initial_prices, [110.0, 57.0])
 
 
 if __name__ == "__main__":

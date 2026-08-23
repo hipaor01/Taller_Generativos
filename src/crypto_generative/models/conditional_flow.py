@@ -564,7 +564,12 @@ class ConditionalFlowGenerator:
         device: str | torch.device | None = None,
     ) -> "ConditionalFlowGenerator":
         checkpoint = torch.load(path, map_location="cpu", weights_only=False)
-        config = ConditionalFlowConfig(**checkpoint["config"])
+        config_values = dict(checkpoint["config"])
+        # Compatibilidad con los primeros checkpoints del notebook, que
+        # llamaban ``epochs`` al límite denominado ``max_epochs`` en el módulo.
+        if "epochs" in config_values and "max_epochs" not in config_values:
+            config_values["max_epochs"] = config_values.pop("epochs")
+        config = ConditionalFlowConfig(**config_values)
         generator = cls(config=config, device=device)
         generator.model.load_state_dict(checkpoint["model_state_dict"])
         generator.history = FlowTrainingHistory(**checkpoint.get("history", {}))

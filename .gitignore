@@ -2,7 +2,16 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-outputs/
+outputs/*
+!outputs/downstream_common/
+outputs/downstream_common/*
+!outputs/downstream_common/*.csv
+!outputs/downstream_common/*.json
+!outputs/downstream_common/*.png
+!outputs/downstream_common/*/
+outputs/downstream_common/*/*
+!outputs/downstream_common/*/*.csv
+!outputs/downstream_common/*/*.png
 tmp/
 
 # Los datos brutos se regeneran con scripts/download_binance.py.

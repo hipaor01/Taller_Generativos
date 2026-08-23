@@ -60,6 +60,23 @@ class ConditionalFlowTests(unittest.TestCase):
             loaded_scores = loaded.log_prob(x[30:], c[30:])
             np.testing.assert_allclose(scores, loaded_scores, rtol=1e-6, atol=1e-6)
 
+    def test_load_accepts_notebook_epochs_key(self):
+        generator = ConditionalFlowGenerator(self.config, device="cpu")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "notebook_flow.pt"
+            config = dict(generator.config.__dict__)
+            config["epochs"] = config.pop("max_epochs")
+            torch.save(
+                {
+                    "config": config,
+                    "model_state_dict": generator.model.state_dict(),
+                },
+                path,
+            )
+            loaded = ConditionalFlowGenerator.load(path, device="cpu")
+
+        self.assertEqual(loaded.config.max_epochs, self.config.max_epochs)
+
 
 if __name__ == "__main__":
     unittest.main()

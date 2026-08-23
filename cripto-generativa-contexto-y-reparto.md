@@ -3,6 +3,11 @@
 **Documento de arranque — equipo de 3 personas**  
 Fecha límite de entrega: 4 de septiembre de 2026
 
+Este documento conserva el alcance y los criterios acordados al inicio. Sus
+frases en futuro describen objetivos, no evidencia de ejecución; el estado y
+los resultados comprobables se documentan en el `README.md` y en los notebooks
+ejecutados.
+
 ---
 
 ## 1. El problema, en una frase
@@ -184,12 +189,11 @@ Además de la evaluación con ventanas deslizantes, se realizará una evaluació
 
 ## 7. Qué vamos a construir
 
-Dos baselines, dos modelos generativos, un tercer modelo opcional, un evaluador común y una aplicación:
+Un baseline, dos modelos generativos, un tercer modelo opcional, un evaluador común y una aplicación:
 
 | Componente | Qué es |
 |---|---|
-| Baseline 1 | *Stationary* o *block bootstrap* multivariante. Es el rival principal. |
-| Baseline 2 | VAR–GARCH multivariante con innovaciones Student-t y correlación dinámica o constante. |
+| Baseline | *Stationary* o *block bootstrap* multivariante. Es el rival principal. |
 | Modelo 1 | Autoencoder variacional condicional (CVAE) para trayectorias. |
 | Modelo 2 | *Normalizing flow* condicional. |
 | Modelo 3 | Difusión temporal o GAN — opcional, solo si lo anterior está cerrado. |
@@ -198,15 +202,15 @@ Dos baselines, dos modelos generativos, un tercer modelo opcional, un evaluador 
 
 Como control adicional puede incluirse una simulación gaussiana basada en media y covarianza. Su función será mostrar cuánto se pierde al ignorar colas gruesas, volatilidad cambiante y dependencia no lineal.
 
-Una advertencia honesta desde el principio: **es perfectamente posible que el bootstrap o el GARCH ganen**. No sería un fracaso. La pregunta del trabajo no es “¿podemos hacer una red neuronal llamativa?”, sino:
+Una advertencia honesta desde el principio: **es perfectamente posible que el bootstrap gane**. No sería un fracaso. La pregunta del trabajo no es “¿podemos hacer una red neuronal llamativa?”, sino:
 
 > ¿Aporta un modelo generativo no lineal mejoras medibles frente a métodos estadísticos clásicos al reproducir trayectorias, colas, volatilidad y dependencia entre criptoactivos?
 
 ---
 
-## 8. Los baselines
+## 8. El baseline
 
-### Baseline 1 — Block bootstrap multivariante
+### Baseline — Block bootstrap multivariante
 
 Se remuestrearán bloques conjuntos de BTC y ETH, no cada activo por separado. Así se preservan:
 
@@ -216,14 +220,6 @@ Se remuestrearán bloques conjuntos de BTC y ETH, no cada activo por separado. A
 - episodios conjuntos de subida o caída.
 
 Como mejora, los bloques podrán seleccionarse entre periodos con una condición similar a la actual: volatilidad, tendencia y drawdown próximos.
-
-### Baseline 2 — VAR–GARCH con Student-t
-
-El componente VAR modelará la dependencia lineal entre retornos. El componente GARCH recogerá la persistencia de la volatilidad y las innovaciones Student-t permitirán colas más gruesas que una distribución normal.
-
-Si un DCC-GARCH resulta demasiado costoso o inestable, se utilizará una correlación condicional constante y se documentará la simplificación.
-
----
 
 ## 9. Los modelos generativos
 
@@ -258,7 +254,7 @@ Si la dimensión de la trayectoria completa dificulta el entrenamiento, se aplic
 Solo se iniciará si:
 
 - los datos están congelados;
-- los dos baselines funcionan;
+- el block bootstrap funciona;
 - el evaluador está cerrado;
 - CVAE y flow producen resultados reproducibles.
 
@@ -361,7 +357,7 @@ Ejemplos de preguntas:
 - ¿Cómo cambia el riesgo cuando la correlación BTC–ETH aumenta?
 - ¿Los modelos generan caídas rápidas y recuperaciones, o solo trayectorias suaves?
 - ¿En qué percentil del modelo cae un episodio histórico reservado?
-- ¿Difieren mucho el VaR y el ES generativos de los obtenidos por bootstrap y GARCH?
+- ¿Difieren mucho el VaR y el ES generativos de los obtenidos por bootstrap?
 
 Los percentiles se interpretarán siempre como probabilidades estimadas **dentro del modelo**, no como frecuencias verdaderas garantizadas.
 
@@ -377,9 +373,9 @@ El reparto está diseñado para que nadie espere a nadie. Los tres compartirán 
 - periodos de entrenamiento, validación y prueba;
 - semillas y registro de experimentos.
 
-### Persona A — Datos, baselines y evaluador
+### Persona A — Datos, baseline y evaluador
 
-Construye el panel temporal alineado, audita los datos, genera las ventanas, implementa los dos baselines y mantiene el evaluador común.
+Construye el panel temporal alineado, audita los datos, genera las ventanas, implementa el block bootstrap y mantiene el evaluador común.
 
 Es la ruta crítica. Los modelos generativos no pueden evaluarse de forma fiable hasta que exista un pipeline común.
 
@@ -420,7 +416,7 @@ También se encarga de:
 | Semana | Objetivo | Hito |
 |---|---|---|
 | 28 jul–2 ago | Fuente decidida, datos auditados, universo y splits congelados | **Reunión de arranque y ficha de datos** |
-| 3–9 ago | Baselines y primeras versiones de CVAE y flow | **Checkpoint 1: todos pasan por el evaluador mínimo** |
+| 3–9 ago | Baseline y primeras versiones de CVAE y flow | **Checkpoint 1: todos pasan por el evaluador mínimo** |
 | 10–16 ago | Ajuste y evaluación estadística | **Checkpoint 2 + go/no-go de SOL y tercer modelo** |
 | 17–23 ago | Stress testing de la cartera | Modelos congelados |
 | 24–28 ago | Experimentos finales y análisis de resultados | **Experimentos congelados** |
@@ -446,9 +442,10 @@ Si el 16 de agosto CVAE, flow o evaluador no son estables, se cancela el tercer 
 6. **No se mezclan exchanges o divisas** sin un estudio previo de compatibilidad.
 7. **La cartera, los pesos y las métricas se fijan antes de comparar resultados.**
 8. **Las métricas se acuerdan antes de ver los resultados finales.**
-9. **Se registran semillas, hiperparámetros, versión de datos y resultados** en un sistema compartido como MLflow.
+9. **Se registran semillas, hiperparámetros, versión de datos y resultados** en metadatos JSON/CSV con checksums; MLflow queda como extensión opcional.
 10. **Los escenarios sintéticos no se cuentan como observaciones históricas independientes.**
 11. **Congelación de experimentos el 28 de agosto.** La última semana se reserva para redacción y presentación.
+12. **El entorno se congela** con Python 3.11.14, dependencias exactas y un `uv.lock` verificado antes de ejecutar tests o notebooks.
 
 ---
 
@@ -457,6 +454,7 @@ Si el 16 de agosto CVAE, flow o evaluador no son estables, se cancela el tercer 
 El proyecto se considerará satisfactorio si:
 
 - existe un pipeline reproducible de datos a escenarios;
+- el entorno puede reconstruirse desde el lock sin resolver versiones nuevas;
 - los modelos generan trayectorias válidas y no simples copias;
 - se preservan razonablemente colas, volatilidad y dependencia;
 - la cartera puede revalorizarse bajo cualquier generador;
@@ -478,7 +476,7 @@ sería una conclusión válida y defendible.
 - **No crea historia económica nueva.**
 - **No garantiza** la probabilidad verdadera de una crisis.
 - **No convierte** ventanas solapadas en observaciones independientes.
-- **No asegura** que los modelos generativos superen a bootstrap o GARCH.
+- **No asegura** que los modelos generativos superen al bootstrap.
 - **No modela inicialmente** derivados, opciones, liquidaciones, *funding rates* ni apalancamiento.
 - **No incorpora** riesgo de custodia, contraparte, hackeo, regulación o pérdida total de un exchange.
 - **No genera inicialmente** microestructura de mercado ni libro de órdenes.
@@ -494,7 +492,6 @@ sería una conclusión válida y defendible.
 - Retornos a seis horas.
 - Trayectorias de 30 días.
 - Block bootstrap.
-- VAR–GARCH Student-t.
 - CVAE.
 - Normalizing flow.
 - Evaluación común.
@@ -534,4 +531,3 @@ La versión mínima debe quedar completa antes de iniciar cualquiera de estas ex
   <https://arxiv.org/abs/2410.18897>
 - *Predict, Refine, Synthesize: Self-Guiding Diffusion Models for Probabilistic Time Series Forecasting* (NeurIPS 2023):  
   <https://github.com/amazon-science/unconditional-time-series-diffusion>
-

@@ -3,10 +3,48 @@
 Pipeline reproducible para generar trayectorias conjuntas de retornos de Bitcoin
 y Ethereum a 30 días y evaluar el riesgo de una cartera BTC–ETH.
 
-Este README explica principalmente cómo deben consumir los datos las personas
-encargadas del CVAE y del *normalizing flow*. La planificación completa y el
-reparto del trabajo están en
+Este README documenta el dataset común, el entorno, los modelos, las
+aplicaciones y las comparaciones reproducibles del proyecto. La planificación
+original y el reparto del trabajo están en
 [`cripto-generativa-contexto-y-reparto.md`](cripto-generativa-contexto-y-reparto.md).
+
+## Entorno reproducible
+
+El entorno de referencia está congelado con:
+
+- Python 3.11.14, declarado en [`.python-version`](.python-version);
+- uv 0.11.24;
+- dependencias directas exactas en [`pyproject.toml`](pyproject.toml);
+- resolución transitiva, marcadores de plataforma y hashes en
+  [`uv.lock`](uv.lock).
+
+El entorno local actual se ha verificado en macOS arm64. El lock también conserva
+las resoluciones compatibles disponibles para otras plataformas, pero
+TensorFlow y PyTorch pueden utilizar backends de hardware diferentes y no se
+promete identidad bit a bit entre CPU, MPS y CUDA.
+
+Desde la raíz del repositorio, el entorno de ejecución de tests, notebooks,
+CVAE, flow y GAN se instala con:
+
+```bash
+./scripts/setup_environment.sh
+source .venv/bin/activate
+```
+
+El script ejecuta `uv sync --frozen --all-extras`: falla si `pyproject.toml` y
+el lock no coinciden, en lugar de resolver versiones nuevas silenciosamente.
+La comprobación puede repetirse en cualquier momento:
+
+```bash
+uv lock --check
+uv run --frozen python scripts/check_environment.py
+uv run --frozen pytest -q
+```
+
+No se debe ejecutar `pip install --upgrade` dentro de este entorno. Un cambio de
+dependencias es una modificación deliberada del experimento: se actualiza
+`pyproject.toml`, se regenera `uv.lock`, se pasan todas las pruebas y se vuelven
+a ejecutar únicamente los notebooks cuyos resultados dependan del cambio.
 
 ## Resumen del dataset
 
@@ -235,7 +273,8 @@ No se deben reconstruir precios a partir de retornos todavía normalizados.
 ## Evaluador común
 
 El primer bloque del evaluador compartido ya está disponible como módulo
-importable. Tras instalar el proyecto con `python -m pip install -e .`, se pueden evaluar las distribuciones marginales de sus trayectorias
+importable. Tras preparar el entorno con `scripts/setup_environment.sh`, se
+pueden evaluar las distribuciones marginales de sus trayectorias
 con la misma implementación:
 
 ```python
@@ -510,21 +549,20 @@ neuronales deben consumir por defecto el artefacto normalizado.
 
 Requisitos:
 
-- Python 3.9 o posterior;
-- NumPy 1.23 o posterior;
+- entorno congelado preparado con `scripts/setup_environment.sh`;
 - conexión a Internet únicamente para el primer comando;
 - no se necesita clave API de Binance.
 
 Desde la raíz:
 
 ```bash
-python3 scripts/download_binance.py --end 2026-07-31T06:00:00Z
-python3 scripts/build_btc_eth_panel.py
-python3 scripts/build_log_returns.py
-python3 scripts/build_temporal_windows.py
-python3 scripts/build_condition_features.py
-python3 scripts/build_temporal_split.py
-python3 scripts/fit_apply_normalization.py
+uv run --frozen python scripts/download_binance.py --end 2026-07-31T06:00:00Z
+uv run --frozen python scripts/build_btc_eth_panel.py
+uv run --frozen python scripts/build_log_returns.py
+uv run --frozen python scripts/build_temporal_windows.py
+uv run --frozen python scripts/build_condition_features.py
+uv run --frozen python scripts/build_temporal_split.py
+uv run --frozen python scripts/fit_apply_normalization.py
 ```
 
 El `--end` es exclusivo y fija el snapshot utilizado por el equipo. No se debe
@@ -534,10 +572,10 @@ nuevas velas cerradas y cambiaría muestras, hashes y resultados.
 Ejecutar después las pruebas:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+uv run --frozen pytest -q
 ```
 
-Y verificar las huellas publicadas en cada carpeta:
+Y verificar las huellas versionadas en cada carpeta:
 
 ```bash
 cd data/normalized/binance
@@ -589,13 +627,162 @@ actualizar los checksums y comunicar una nueva versión al equipo.
 - Vector de condición: completado.
 - Split temporal con purga: congelado.
 - Normalización ajustada en entrenamiento: completada.
-- *Block bootstrap* multivariante: primera versión didáctica en
+- *Block bootstrap* multivariante: baseline completo en
   [`notebooks/01_block_bootstrap_multivariante.ipynb`](notebooks/01_block_bootstrap_multivariante.ipynb).
 - Evaluador común: métricas marginales, temporales, de dependencia BTC–ETH, de
   trayectoria, riesgo, diversidad y memorización disponibles en
   `crypto_generative.evaluation`.
-- CVAE condicional: búsqueda completa, evaluación y artefactos terminados.
-- Próximo componente opcional: comparar contra el *normalizing flow* del equipo.
+- CVAE condicional: entrenamiento y evaluación ejecutados; el notebook genera
+  los artefactos locales de inferencia y escenarios.
+- *Normalizing flow* condicional: entrenamiento, densidad exacta, evaluación común
+  y experimento *downstream* terminados.
+- GAN condicional opcional: entrenamiento, evaluación común y experimento
+  *downstream* terminados.
+- Aplicación común de cartera y stress testing: implementada para histórico,
+  shocks prefijados, bootstrap y artefactos generativos compatibles.
+- Generación masiva al último estado disponible: 100.000 escenarios por modelo,
+  persistencia por lotes e informe de cartera completados.
+- Comparación final consolidada: bootstrap y tres generadores evaluados por
+  dimensión, sin agregar objetivos heterogéneos en un score global arbitrario.
+- Comparación downstream común: los cuatro métodos evaluados con la misma MLP y
+  mezclas `0`, `+25`, `+50` y `+100 %`, manteniendo validación y test reales.
+
+## Aplicación común de cartera y stress testing
+
+La aplicación utiliza una única implementación para todas las fuentes de
+escenarios. Revaloriza una cartera inicial de 100.000 USD, con 60 % BTC y 40 %
+ETH, sin rebalanceo, apalancamiento ni costes. Para cada conjunto calcula:
+
+- valor de cartera cada seis horas;
+- pérdida final y pérdida máxima intraperiodo, en USD y como fracción;
+- máximo drawdown;
+- VaR y Expected Shortfall al 95 % y 99 %.
+
+El notebook común ejecutado está en
+[`notebooks/02_aplicacion_cartera_y_stress.ipynb`](notebooks/02_aplicacion_cartera_y_stress.ipynb).
+También puede ejecutarse como aplicación por línea de comandos:
+
+```bash
+uv run --frozen python scripts/run_portfolio_stress_test.py
+```
+
+La ejecución base compara la distribución histórica de test, los diez peores
+drawdowns históricos, tres shocks BTC–ETH prefijados y 5.000 trayectorias del
+block bootstrap. Si existen los artefactos `test_scenarios.npz` de CVAE, flow o
+GAN bajo `outputs/`, se incorporan automáticamente con las mismas fórmulas. Se
+pueden añadir otros artefactos compatibles de forma explícita:
+
+```bash
+uv run --frozen python scripts/run_portfolio_stress_test.py \
+  --generative mi_modelo=ruta/a/test_scenarios.npz
+```
+
+Los resultados se guardan en `outputs/portfolio_stress_test/` como JSON, dos
+CSV comparables y figuras. El subconjunto de peores episodios históricos y los
+shocks prefijados son ejercicios de severidad seleccionados deliberadamente;
+sus percentiles no deben interpretarse como cobertura probabilística.
+
+## Generación masiva al último estado disponible
+
+La aplicación masiva calcula un vector de condición nuevo con las últimas 240
+velas completas del panel. Esto es distinto de tomar la última condición de
+test, que queda 30 días por detrás del final de los datos porque necesita un
+objetivo futuro observado. Después genera por lotes 100.000 trayectorias de cada
+modelo y acumula las métricas de la cartera sin mantener todo el cálculo en RAM:
+
+```bash
+uv run --frozen python scripts/generate_latest_market_scenarios.py
+```
+
+El número de escenarios, tamaño de lote, modelos y dispositivo son configurables:
+
+```bash
+uv run --frozen python scripts/generate_latest_market_scenarios.py \
+  --n-scenarios 100000 \
+  --batch-size 1000 \
+  --models cvae normalizing_flow conditional_gan \
+  --device auto
+```
+
+La vista ejecutada está en
+[`notebooks/03_generacion_masiva_ultimo_estado.ipynb`](notebooks/03_generacion_masiva_ultimo_estado.ipynb).
+Los artefactos se guardan en `outputs/latest_market_scenarios/`: un `.npy`
+mapeable en memoria por modelo, la condición cruda y normalizada, checksums,
+metadatos temporales y el informe común de cartera en JSON/CSV. La fecha del
+corte se registra de forma explícita: «último» significa el último bloque del
+panel proporcionado, no una consulta automática de mercado en vivo.
+
+Generar más trayectorias reduce el error de Monte Carlo dentro de cada modelo,
+pero no crea observaciones históricas independientes ni corrige sesgos de
+calibración. Para refrescar el estado de mercado primero debe actualizarse el
+panel mediante el pipeline de datos y después repetirse esta ejecución.
+
+## Comparación final consolidada
+
+El consolidador reconstruye el informe estructurado del block bootstrap con la
+configuración congelada y reúne las métricas de los cuatro métodos:
+
+```bash
+uv run --frozen python scripts/build_final_comparison.py
+```
+
+La comparación ejecutada está en
+[`notebooks/04_comparacion_final_consolidada.ipynb`](notebooks/04_comparacion_final_consolidada.ipynb)
+y sus tablas reproducibles en `outputs/final_comparison/`. Se distinguen cuatro
+vistas:
+
+- fidelidad estadística, temporal, conjunta, de trayectoria y diversidad;
+- utilidad downstream con proporciones sintéticas predefinidas y selección por
+  validación;
+- VaR/ES y cobertura sobre el test fuera de muestra;
+- riesgo masivo bajo la última condición disponible del panel.
+
+No se calcula un ganador global, porque combinar esas dimensiones requeriría
+ponderaciones arbitrarias. El block bootstrap ofrece la mejor cobertura VaR y
+dependencia de cola; el CVAE destaca en marginales, correlación en estrés,
+volatilidad y regímenes; el flow en persistencia, retorno final y drawdown. La
+GAN amplía la cobertura geométrica, pero sigue siendo perfectamente distinguible
+de los datos reales y presenta errores elevados, por lo que se conserva como
+sensibilidad opcional y no como modelo principal.
+
+## Comparación downstream común
+
+El experimento downstream responde directamente al segundo objetivo del taller:
+medir qué cambia al entrenar un modelo financiero con distintas cantidades de
+datos sintéticos. La tarea, arquitectura e inicialización permanecen fijas:
+
+- entrada: las 14 variables del estado de mercado previo;
+- objetivo: máximo drawdown a 30 días de la cartera BTC–ETH 60/40;
+- modelo: MLP `64 → 32 → 1`, `dropout=0.10`;
+- mezclas: `0`, `+25`, `+50` y `+100 %` de sintéticos respecto al train real;
+- validación y test: siempre 100 % reales.
+
+La ejecución completa —block bootstrap, CVAE, Flow y GAN— se regenera con:
+
+```bash
+uv run --frozen python scripts/run_common_downstream_comparison.py --device cpu
+```
+
+El análisis específico ejecutado y las curvas de convergencia están en
+[`notebooks/05_comparacion_downstream_comun.ipynb`](notebooks/05_comparacion_downstream_comun.ipynb).
+Sus resultados también forman una dimensión independiente del relato de
+[`notebooks/04_comparacion_final_consolidada.ipynb`](notebooks/04_comparacion_final_consolidada.ipynb).
+Los CSV, metadatos y PNG ligeros se guardan bajo
+`outputs/downstream_common/`. La configuración de `.gitignore` permite
+versionarlos; los checkpoints generativos originales continúan fuera de Git.
+
+En test, `+100 %` reduce el MAE frente a `real_only` un 5,16 % con CVAE, un
+4,32 % con Flow y un 11,36 % con GAN. El bootstrap empeora el MAE global un
+8,68 %, aunque reduce el error del peor decil un 14,31 %. Esta diferencia es
+coherente con su naturaleza incondicional: rompe la relación estado–drawdown,
+pero aporta episodios severos.
+
+La lectura principal no elige la proporción mirando test. Si se selecciona por
+MAE de validación, solo el CVAE escoge augmentación (`+25 %`), con MAE de test
+`7,770 %` frente a `7,955 %` de `real_only`; bootstrap, Flow y GAN seleccionan
+`real_only`. Además, todos los `R²` siguen siendo negativos. Por tanto, hay
+evidencia de mejora relativa para el CVAE, pero no una mejora robusta y general
+para cualquier generador o proporción.
 
 ## CVAE condicional
 
@@ -607,36 +794,27 @@ encoder(target_returns, condition) -> z_mean, z_log_var, z
 decoder(z, condition)              -> loc, scale, rho
 ```
 
-Es la adaptación temporal del VAE convolucional visto en clase. El notebook
-demuestra por qué un decoder MSE no basta para retornos financieros: aproxima la
-media y genera trayectorias demasiado suaves. La búsqueda compara MSE, Gaussiana
-bivariante y Student-t bivariante. Para las salidas probabilísticas se minimiza:
+Es una adaptación temporal del VAE convolucional visto en clase. La
+configuración implementada usa una salida Student-t bivariante y minimiza:
 
 ```text
 loss = NLL_Student_t_bivariante(x | loc, scale, rho)
        + beta * KL_regularizada_con_free_bits
 ```
 
-La Student-t conserva colas gruesas y genera BTC y ETH conjuntamente mediante
-una correlación aprendida en cada paso. La KL organiza el espacio latente para
-muestrear `z ~ N(0, I)` y los *free bits* evitan el colapso posterior temprano.
-
-La búsqueda ejecutada compara 39 configuraciones: distribución, capacidad,
-latentes 4–16, `beta`, *free bits*, grados de libertad, condición resumen,
-Conv1D, GRU, híbrida y pérdida acumulada. Cada candidato usa un barajado
-determinista; el top 3 se repite con semillas 7, 42 y 123. El ganador se elige
-por `media + desviación` del score de validación, no por una ejecución aislada.
-
-El ganador actual es `student_medium_l8_b01`: Student-t bivariante, filtros
-`(32, 64)`, capa densa 96, latente 8, `beta=0.01`, *free bits* `0.02`, 5 grados
-de libertad y condición resumen. El KL de validación permanece activo (~3,55 de
-media entre semillas), por lo que no hay evidencia de colapso posterior.
+La Student-t admite colas más gruesas que una Gaussiana y genera BTC y ETH
+conjuntamente mediante una correlación aprendida en cada paso. La KL organiza el
+espacio latente para muestrear `z ~ N(0, I)` y los *free bits* reducen el riesgo
+de colapso posterior temprano. La ejecución documentada utiliza filtros
+`(32, 64)`, capa densa 96, latente 8, `beta=0.01`, *free bits* `0.02` y 5 grados
+de libertad. El historial de entrenamiento embebido permite comprobar el
+comportamiento de la KL en esa ejecución.
 
 La implementación vive en
 [`notebooks/CVAE_BTC_ETH.ipynb`](notebooks/CVAE_BTC_ETH.ipynb). Se entrega
 completamente ejecutada, con 25 celdas de código y nueve figuras. El notebook
-entrena únicamente el ganador; la sección teórica resume la búsqueda de 39
-configuraciones y explica extensamente su arquitectura, distribución y pérdida.
+entrena una única configuración y explica su arquitectura, distribución y
+pérdida.
 La evaluación replica las vistas del baseline de *block bootstrap* para leer con
 el mismo formato dependencia temporal, relación BTC–ETH, trayectorias, riesgo y
 diversidad. Ambos evalúan ahora sobre las mismas 1.826 trayectorias del test
@@ -646,20 +824,21 @@ por condición; además, las ventanas de test se solapan. Por ello la lectura de
 conservar las diferencias entre pronóstico incondicional y condicional y no
 tratarse como un backtest con observaciones independientes.
 
-Instalación:
+El CVAE utiliza las versiones de TensorFlow y Keras incluidas en el lock común;
+no requiere una instalación adicional:
 
 ```bash
-python3 -m pip install -e '.[cvae]'
+./scripts/setup_environment.sh
 ```
 
-El entrenamiento usa solo `train_sample_ids`, selecciona con
-`validation_sample_ids` y evalúa el ganador en test deslizante y en 16 anclas
+El entrenamiento usa solo `train_sample_ids`, selecciona el checkpoint con
+`validation_sample_ids` y evalúa el modelo en test deslizante y en 16 anclas
 no solapadas. Genera 20 escenarios por condición y entrega los retornos en
 unidades originales al `TrajectoryEvaluator` compartido. Así se calculan las
 seis familias comunes: marginales, dependencia temporal, dependencia BTC–ETH,
 trayectorias, riesgo y diversidad/memorización.
 
-En la ejecución publicada, las desviaciones generadas BTC/ETH son
+En las salidas ejecutadas del notebook, las desviaciones generadas BTC/ETH son
 `0.01093/0.01654`, frente a `0.01091/0.01707` reales, y el error absoluto de
 correlación contemporánea es `0.023`. Las trayectorias son 100 % únicas, no hay
 coincidencias exactas con train y la cobertura de la referencia alcanza el
@@ -673,7 +852,7 @@ exploratorio porque 20 draws por condición no resuelven suficientemente esa
 cola. Las 16 anclas no solapadas sirven como sensibilidad, no como estimación
 precisa de eventos extremos.
 
-Los artefactos quedan en `outputs/cvae_best/`: `encoder.keras`, `decoder.keras`,
-`metadata.json` y `test_scenarios.npz`. Los CSV de búsqueda y estabilidad se
-conservan como evidencia histórica del benchmark, pero el notebook no vuelve a
-entrenar esos candidatos.
+La ejecución genera en `outputs/cvae_best/` los ficheros `encoder.keras`,
+`decoder.keras`, `metadata.json` y `test_scenarios.npz`. Este directorio está
+ignorado por Git y debe regenerarse ejecutando el notebook cuando no exista en
+el entorno local.

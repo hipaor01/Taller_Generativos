@@ -17,17 +17,18 @@ negociacion. No se deben empalmar ambas fuentes sin un analisis previo.
 
 ## Descarga reproducible
 
+Primero se prepara el entorno congelado con `scripts/setup_environment.sh`.
 Desde la raiz del proyecto:
 
 ```bash
-python3 scripts/download_binance.py
+uv run --frozen python scripts/download_binance.py
 ```
 
 El intervalo por defecto es `[2017-01-01, inicio de la vela actual)`. Por tanto,
 solo se guardan velas cerradas. Se puede congelar una fecha de corte concreta:
 
 ```bash
-python3 scripts/download_binance.py --end 2026-07-31T00:00:00Z
+uv run --frozen python scripts/download_binance.py --end 2026-07-31T06:00:00Z
 ```
 
 Se generan:
@@ -40,14 +41,15 @@ Se generan:
 El manifiesto registra fuente, mercado, divisa base y cotizada, intervalo,
 fechas solicitadas y observadas, fecha de descarga, huecos, duplicados y valores
 de precio o volumen anomalos. Los ficheros brutos estan ignorados por Git porque
-son regenerables y su version queda definida por el manifiesto.
+son regenerables. Cada descarga deja su procedencia en el manifiesto y sus
+huellas en `SHA256SUMS`.
 
 ## Panel limpio BTC-ETH
 
 Para validar y alinear ambos activos en un calendario regular de seis horas:
 
 ```bash
-python3 scripts/build_btc_eth_panel.py
+uv run --frozen python scripts/build_btc_eth_panel.py
 ```
 
 El resultado vive en `data/processed/binance/`. Los huecos se conservan como
@@ -63,7 +65,7 @@ entrenamiento que atraviesen filas incompletas deben excluirse.
 Para calcular los retornos conjuntos:
 
 ```bash
-python3 scripts/build_log_returns.py
+uv run --frozen python scripts/build_log_returns.py
 ```
 
 El resultado se guarda en `data/features/binance/`. Se aplica
@@ -77,7 +79,7 @@ frecuencia.
 Para construir condiciones de 60 dias y objetivos de 30 dias:
 
 ```bash
-python3 scripts/build_temporal_windows.py
+uv run --frozen python scripts/build_temporal_windows.py
 ```
 
 El fichero `.npz` contiene matrices `condition_returns [n, 240, 2]` y
@@ -91,7 +93,7 @@ independientes. Toda ventana que toque un retorno no valido se descarta.
 Para resumir los 60 dias anteriores a cada objetivo:
 
 ```bash
-python3 scripts/build_condition_features.py
+uv run --frozen python scripts/build_condition_features.py
 ```
 
 Se generan 14 variables: por activo, retorno acumulado, volatilidad anualizada,
@@ -105,7 +107,7 @@ normalizacion global para evitar filtracion de informacion antes del split.
 Para congelar entrenamiento, validacion y prueba:
 
 ```bash
-python3 scripts/build_temporal_split.py
+uv run --frozen python scripts/build_temporal_split.py
 ```
 
 La asignacion usa `target_start_utc`. Se purgan 90 dias de inicios de objetivo
@@ -120,7 +122,7 @@ evaluar modelos.
 Para ajustar y aplicar la normalizacion sin filtracion temporal:
 
 ```bash
-python3 scripts/fit_apply_normalization.py
+uv run --frozen python scripts/fit_apply_normalization.py
 ```
 
 Las 14 condiciones se estandarizan con las muestras de entrenamiento. Los
