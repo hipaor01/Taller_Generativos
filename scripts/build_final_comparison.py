@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+import numpy as np
+
 from _bootstrap import PROJECT_ROOT
 
 from crypto_generative.comparison import (
@@ -32,7 +34,10 @@ from crypto_generative.evaluation import (
     TrajectoryEvaluator,
     TrajectoryMetricsConfig,
 )
-from crypto_generative.models import MultivariateBlockBootstrap
+from crypto_generative.models import (
+    ConditionalMultivariateBlockBootstrap,
+    frozen_conditional_bootstrap_config,
+)
 
 
 NORMALIZED = (
@@ -56,6 +61,7 @@ LATEST_METADATA = PROJECT_ROOT / "outputs/latest_market_scenarios/metadata.json"
 DOWNSTREAM = PROJECT_ROOT / "outputs/downstream_common/comparison.csv"
 BASELINE_OUTPUT = PROJECT_ROOT / "outputs/block_bootstrap_best/metadata.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "outputs/final_comparison"
+SCENARIOS_PER_CONDITION = 20
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,12 +75,23 @@ def evaluate_bootstrap(path: Path) -> Mapping[str, Any]:
     loader = ProjectScenarioLoader(NORMALIZED, SPLIT, SPLIT_INDEX, PANEL)
     train = loader.load_split("train")
     test = loader.load_split("test")
-    training_series = loader.load_bootstrap_training_series()
-    bootstrap = MultivariateBlockBootstrap(
-        block_length=12,
-        random_state=5_042,
-    ).fit(training_series.log_returns, training_series.segment_ids)
-    candidate = bootstrap.sample(n_scenarios=5_000, horizon_steps=120)
+    train_conditions = loader.load_normalized_conditions(train.sample_ids)
+    test_conditions = loader.load_normalized_conditions(test.sample_ids)
+    bootstrap_config = frozen_conditional_bootstrap_config(random_state=5_042)
+    bootstrap = ConditionalMultivariateBlockBootstrap(bootstrap_config).fit(
+        train.log_returns, train_conditions
+    )
+    repeated_conditions = np.repeat(
+        test_conditions, SCENARIOS_PER_CONDITION, axis=0
+    )
+    candidate = bootstrap.sample(
+        n_scenarios=len(repeated_conditions),
+        cond=repeated_conditions,
+        horizon_steps=120,
+    )
+    conditional_candidate = candidate.reshape(
+        len(test.log_returns), SCENARIOS_PER_CONDITION, 120, 2
+    )
 
     evaluator = TrajectoryEvaluator(assets=("BTC", "ETH"))
     evaluation = {
@@ -109,7 +126,7 @@ def evaluate_bootstrap(path: Path) -> Mapping[str, Any]:
         ).to_dict(),
         "risk": evaluator.evaluate_risk(
             test.log_returns,
-            candidate,
+            conditional_candidate,
             config=RiskMetricsConfig(
                 confidence_levels=(0.95, 0.99),
                 portfolio_weights=(0.60, 0.40),
@@ -135,18 +152,22 @@ def evaluate_bootstrap(path: Path) -> Mapping[str, Any]:
         ).to_dict(),
     }
     metadata = {
-        "model": "moving_block_bootstrap_multivariate",
+        "model": "conditional_moving_block_bootstrap_multivariate",
         "created_at_utc": datetime.now(timezone.utc).isoformat().replace(
             "+00:00", "Z"
         ),
         "selected_config": {
-            "block_length_steps": 12,
-            "block_length_days": 3,
+            "block_length_steps": bootstrap_config.block_length,
+            "block_length_days": bootstrap_config.block_length * 6 / 24,
+            "n_neighbors": bootstrap_config.n_neighbors,
             "horizon_steps": 120,
             "random_state": 5_042,
-            "scenario_count": 5_000,
+            "scenarios_per_condition": SCENARIOS_PER_CONDITION,
+            "scenario_count": len(candidate),
         },
-        "selection": "Longitud seleccionada exclusivamente con validación",
+        "selection": (
+            "Longitud y número de vecinos seleccionados exclusivamente con validación"
+        ),
         "train_samples": len(train.log_returns),
         "test_samples": len(test.log_returns),
         "evaluation": evaluation,

@@ -70,18 +70,30 @@ class ProjectScenarioLoader:
         with np.load(self.split_path, allow_pickle=False) as split_data:
             sample_ids = split_data[key_by_split[split]].astype(np.int64)
 
-        position_by_id = {int(sample_id): index for index, sample_id in enumerate(stored_ids)}
-        try:
-            positions = np.asarray(
-                [position_by_id[int(sample_id)] for sample_id in sample_ids],
-                dtype=np.int64,
-            )
-        except KeyError as error:
-            raise ValueError(f"sample_id no encontrado en dataset: {error.args[0]}") from error
+        positions = self._positions_by_id(stored_ids, sample_ids)
         log_returns = targets[positions] * return_scale + return_mean
         labels_by_id = self._load_target_labels()
         labels = tuple(labels_by_id[int(sample_id)] for sample_id in sample_ids)
         return FrozenPathBatch(split, sample_ids, log_returns, labels, assets)
+
+    def load_normalized_conditions(
+        self,
+        sample_ids: NDArray[np.int64],
+    ) -> NDArray[np.float64]:
+        """Carga las condiciones normalizadas alineadas con ``sample_ids``."""
+
+        self._require(self.normalized_path)
+        requested_ids = np.asarray(sample_ids, dtype=np.int64)
+        if requested_ids.ndim != 1:
+            raise ValueError("sample_ids debe ser un vector")
+        with np.load(self.normalized_path, allow_pickle=False) as data:
+            stored_ids = data["sample_ids"].astype(np.int64)
+            conditions = data["condition_features"].astype(np.float64)
+        positions = self._positions_by_id(stored_ids, requested_ids)
+        selected = conditions[positions]
+        if selected.ndim != 2 or not np.isfinite(selected).all():
+            raise ValueError("Las condiciones cargadas no son una matriz finita")
+        return selected
 
     def load_bootstrap_training_series(self) -> BootstrapTrainingSeries:
         """Reconstruye retornos únicos de train sin multiplicar ventanas solapadas."""
@@ -207,10 +219,27 @@ class ProjectScenarioLoader:
         if missing:
             raise FileNotFoundError("Faltan artefactos: " + ", ".join(missing))
 
+    @staticmethod
+    def _positions_by_id(
+        stored_ids: NDArray[np.int64],
+        requested_ids: NDArray[np.int64],
+    ) -> NDArray[np.int64]:
+        position_by_id = {
+            int(sample_id): index for index, sample_id in enumerate(stored_ids)
+        }
+        try:
+            return np.asarray(
+                [position_by_id[int(sample_id)] for sample_id in requested_ids],
+                dtype=np.int64,
+            )
+        except KeyError as error:
+            raise ValueError(
+                f"sample_id no encontrado en dataset: {error.args[0]}"
+            ) from error
+
 
 def _parse_utc(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         raise ValueError(f"Timestamp sin zona horaria: {value}")
     return parsed.astimezone(timezone.utc)
-

@@ -124,6 +124,26 @@ class BuyAndHoldPortfolioTest(unittest.TestCase):
 
 
 class ProjectScenarioLoaderTest(unittest.TestCase):
+    def test_loads_normalized_conditions_in_requested_order(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            np.savez_compressed(
+                root / "normalized.npz",
+                sample_ids=np.asarray([10, 11, 12]),
+                condition_features=np.asarray(
+                    [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+                ),
+            )
+            loader = ProjectScenarioLoader(
+                root / "normalized.npz",
+                root / "split.npz",
+                root / "index.csv",
+                root / "panel.csv",
+            )
+            selected = loader.load_normalized_conditions(np.asarray([12, 10]))
+
+        np.testing.assert_array_equal(selected, [[5.0, 6.0], [1.0, 2.0]])
+
     def test_loads_shared_conditional_artifact_and_checks_reference(self):
         real = np.zeros((2, 4, 2), dtype=float)
         conditional = np.ones((2, 3, 4, 2), dtype=float) * 0.01

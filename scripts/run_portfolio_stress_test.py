@@ -25,7 +25,12 @@ import matplotlib.pyplot as plt
 from _bootstrap import PROJECT_ROOT as ROOT  # noqa: F401
 from crypto_generative.data import ProjectScenarioLoader
 from crypto_generative.data.artifacts import write_csv_atomic, write_json_atomic
-from crypto_generative.models import BlockBootstrapConfig, MultivariateBlockBootstrap
+from crypto_generative.models import (
+    FROZEN_CONDITIONAL_BLOCK_LENGTH,
+    FROZEN_CONDITIONAL_NEIGHBORS,
+    ConditionalBlockBootstrapConfig,
+    ConditionalMultivariateBlockBootstrap,
+)
 from crypto_generative.portfolio import (
     BuyAndHoldPortfolio,
     PortfolioConfig,
@@ -76,8 +81,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-value", type=float, default=100_000.0)
     parser.add_argument("--btc-weight", type=float, default=0.60)
     parser.add_argument("--eth-weight", type=float, default=0.40)
-    parser.add_argument("--bootstrap-scenarios", type=int, default=5_000)
-    parser.add_argument("--bootstrap-block-length", type=int, default=12)
+    parser.add_argument(
+        "--bootstrap-scenarios",
+        type=int,
+        default=None,
+        help="Número agregado opcional; por defecto se generan draws por condición.",
+    )
+    parser.add_argument("--bootstrap-scenarios-per-condition", type=int, default=20)
+    parser.add_argument(
+        "--bootstrap-block-length",
+        type=int,
+        default=FROZEN_CONDITIONAL_BLOCK_LENGTH,
+    )
+    parser.add_argument(
+        "--bootstrap-neighbors",
+        type=int,
+        default=FROZEN_CONDITIONAL_NEIGHBORS,
+    )
     parser.add_argument("--historical-stress-count", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -100,8 +120,12 @@ def build_scenario_sets(
     loader: ProjectScenarioLoader,
     portfolio: BuyAndHoldPortfolio,
 ) -> Sequence[StressScenarioSet]:
+    if args.bootstrap_scenarios is not None and args.bootstrap_scenarios <= 0:
+        raise ValueError("bootstrap-scenarios debe ser positivo")
+    if args.bootstrap_scenarios_per_condition <= 0:
+        raise ValueError("bootstrap-scenarios-per-condition debe ser positivo")
     test = loader.load_split("test")
-    training = loader.load_bootstrap_training_series()
+    training = loader.load_split("train")
     if test.assets != portfolio.config.assets or training.assets != test.assets:
         raise ValueError("El orden de activos de datos y cartera no coincide")
 
@@ -142,23 +166,46 @@ def build_scenario_sets(
     )
     scenario_sets.extend(default_prefixed_scenarios())
 
-    bootstrap = MultivariateBlockBootstrap(
-        BlockBootstrapConfig(
+    train_conditions = loader.load_normalized_conditions(training.sample_ids)
+    test_conditions = loader.load_normalized_conditions(test.sample_ids)
+    if args.bootstrap_scenarios is None:
+        bootstrap_conditions = np.repeat(
+            test_conditions,
+            args.bootstrap_scenarios_per_condition,
+            axis=0,
+        )
+    else:
+        condition_rng = np.random.default_rng(args.seed + 4_999)
+        condition_indices = condition_rng.integers(
+            0, len(test_conditions), size=args.bootstrap_scenarios
+        )
+        bootstrap_conditions = test_conditions[condition_indices]
+    bootstrap = ConditionalMultivariateBlockBootstrap(
+        ConditionalBlockBootstrapConfig(
             block_length=args.bootstrap_block_length,
             horizon_steps=test.log_returns.shape[1],
+            n_neighbors=args.bootstrap_neighbors,
             random_state=args.seed + 5_000,
         )
-    ).fit(training.log_returns, training.segment_ids)
+    ).fit(training.log_returns, train_conditions)
     scenario_sets.append(
         StressScenarioSet(
             name="block_bootstrap",
             category=ScenarioCategory.BASELINE,
-            log_returns=bootstrap.sample(args.bootstrap_scenarios),
+            log_returns=bootstrap.sample(
+                len(bootstrap_conditions), cond=bootstrap_conditions
+            ),
             metadata={
                 "block_length_steps": args.bootstrap_block_length,
+                "n_neighbors": args.bootstrap_neighbors,
                 "seed": args.seed + 5_000,
-                "training_unique_returns": len(training.log_returns),
+                "training_paths": len(training.log_returns),
                 "candidate_blocks": len(bootstrap.blocks),
+                "scenarios_per_condition": (
+                    args.bootstrap_scenarios_per_condition
+                    if args.bootstrap_scenarios is None
+                    else None
+                ),
             },
         )
     )

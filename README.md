@@ -627,7 +627,8 @@ actualizar los checksums y comunicar una nueva versión al equipo.
 - Vector de condición: completado.
 - Split temporal con purga: congelado.
 - Normalización ajustada en entrenamiento: completada.
-- *Block bootstrap* multivariante: baseline completo en
+- *Block bootstrap* multivariante condicionado por vecinos próximos sobre las
+  mismas 14 variables normalizadas de los generadores: baseline completo en
   [`notebooks/01_block_bootstrap_multivariante.ipynb`](notebooks/01_block_bootstrap_multivariante.ipynb).
 - Evaluador común: métricas marginales, temporales, de dependencia BTC–ETH, de
   trayectoria, riesgo, diversidad y memorización disponibles en
@@ -667,10 +668,11 @@ uv run --frozen python scripts/run_portfolio_stress_test.py
 ```
 
 La ejecución base compara la distribución histórica de test, los diez peores
-drawdowns históricos, tres shocks BTC–ETH prefijados y 5.000 trayectorias del
-block bootstrap. Si existen los artefactos `test_scenarios.npz` de CVAE, flow o
-GAN bajo `outputs/`, se incorporan automáticamente con las mismas fórmulas. Se
-pueden añadir otros artefactos compatibles de forma explícita:
+drawdowns históricos, tres shocks BTC–ETH prefijados y 20 trayectorias del
+bootstrap por cada condición de test. Si existen los artefactos
+`test_scenarios.npz` de CVAE, flow o GAN bajo `outputs/`, se incorporan
+automáticamente con las mismas fórmulas. Se pueden añadir otros artefactos
+compatibles de forma explícita:
 
 ```bash
 uv run --frozen python scripts/run_portfolio_stress_test.py \
@@ -738,12 +740,9 @@ vistas:
 - riesgo masivo bajo la última condición disponible del panel.
 
 No se calcula un ganador global, porque combinar esas dimensiones requeriría
-ponderaciones arbitrarias. El block bootstrap ofrece la mejor cobertura VaR y
-dependencia de cola; el CVAE destaca en marginales, correlación en estrés,
-volatilidad y regímenes; el flow en persistencia, retorno final y drawdown. La
-GAN amplía la cobertura geométrica, pero sigue siendo perfectamente distinguible
-de los datos reales y presenta errores elevados, por lo que se conserva como
-sensibilidad opcional y no como modelo principal.
+ponderaciones arbitrarias. Tras cambiar el bootstrap de incondicional a
+condicionado deben regenerarse los artefactos de stress, downstream y
+comparación final antes de volver a formular conclusiones comparativas.
 
 ## Comparación downstream común
 
@@ -771,18 +770,11 @@ Los CSV, metadatos y PNG ligeros se guardan bajo
 `outputs/downstream_common/`. La configuración de `.gitignore` permite
 versionarlos; los checkpoints generativos originales continúan fuera de Git.
 
-En test, `+100 %` reduce el MAE frente a `real_only` un 5,16 % con CVAE, un
-4,32 % con Flow y un 11,36 % con GAN. El bootstrap empeora el MAE global un
-8,68 %, aunque reduce el error del peor decil un 14,31 %. Esta diferencia es
-coherente con su naturaleza incondicional: rompe la relación estado–drawdown,
-pero aporta episodios severos.
-
-La lectura principal no elige la proporción mirando test. Si se selecciona por
-MAE de validación, solo el CVAE escoge augmentación (`+25 %`), con MAE de test
-`7,770 %` frente a `7,955 %` de `real_only`; bootstrap, Flow y GAN seleccionan
-`real_only`. Además, todos los `R²` siguen siendo negativos. Por tanto, hay
-evidencia de mejora relativa para el CVAE, pero no una mejora robusta y general
-para cualquier generador o proporción.
+Los resultados versionados de esta sección proceden del bootstrap
+incondicional anterior. Deben regenerarse antes de interpretar qué mezcla
+selecciona validación o cómo cambia el error en test. La lectura principal no
+elige la proporción mirando test: cualquier mejora observada solo allí sigue
+siendo descriptiva.
 
 ## CVAE condicional
 
@@ -819,10 +811,9 @@ La evaluación replica las vistas del baseline de *block bootstrap* para leer co
 el mismo formato dependencia temporal, relación BTC–ETH, trayectorias, riesgo y
 diversidad. Ambos evalúan ahora sobre las mismas 1.826 trayectorias del test
 congelado, por lo que sus métricas permiten una comparación descriptiva fuera de
-muestra. El bootstrap genera una distribución agregada y el CVAE 20 escenarios
-por condición; además, las ventanas de test se solapan. Por ello la lectura debe
-conservar las diferencias entre pronóstico incondicional y condicional y no
-tratarse como un backtest con observaciones independientes.
+muestra. Ambos generan ahora 20 escenarios por condición; además, las ventanas
+de test se solapan. Por ello la lectura no debe tratarse como un backtest con
+observaciones independientes.
 
 El CVAE utiliza las versiones de TensorFlow y Keras incluidas en el lock común;
 no requiere una instalación adicional:

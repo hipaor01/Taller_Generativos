@@ -29,7 +29,8 @@ from crypto_generative.models import (
     ConditionalCVAEDecoder,
     ConditionalFlowGenerator,
     ConditionalGANGenerator,
-    MultivariateBlockBootstrap,
+    ConditionalMultivariateBlockBootstrap,
+    frozen_conditional_bootstrap_config,
 )
 
 
@@ -166,11 +167,11 @@ def load_sampler(name: str, *, device: str, seed: int) -> SamplerSpec:
         return SamplerSpec(name, sampler, True, generation_seed)
     if name == "block_bootstrap":
         loader = ProjectScenarioLoader(NORMALIZED, SPLIT, SPLIT_INDEX, PANEL)
-        series = loader.load_bootstrap_training_series()
-        sampler = MultivariateBlockBootstrap(
-            block_length=12,
-            random_state=generation_seed,
-        ).fit(series.log_returns, series.segment_ids)
+        train = loader.load_split("train")
+        train_conditions = loader.load_normalized_conditions(train.sample_ids)
+        sampler = ConditionalMultivariateBlockBootstrap(
+            frozen_conditional_bootstrap_config(random_state=generation_seed)
+        ).fit(train.log_returns, train_conditions)
         return SamplerSpec(name, sampler, False, generation_seed)
     raise ValueError(f"Modelo no soportado: {name}")
 
@@ -337,7 +338,11 @@ class CommonDownstreamExperiment:
 
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=rows[0].keys(),
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
